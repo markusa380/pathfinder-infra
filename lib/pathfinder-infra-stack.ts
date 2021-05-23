@@ -14,7 +14,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     // Cron expressions in UTC
     const startTime = "cron(0 20 * * ? *)"; // 21:00 BST
-    const stopTime = "cron(0 2 * * ? *)" // 01:00 BST
+    const stopTime = "cron(0 2 * * ? *)"; // 01:00 BST
 
     const teamspeakCpu = 256;
     const teamspeakMem = 1024;
@@ -285,7 +285,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-12"
+        "markusa380/arma3server:release-13"
       ),
       memoryLimitMiB: armaMem,
       environment: {
