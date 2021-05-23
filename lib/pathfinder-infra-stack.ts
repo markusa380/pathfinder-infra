@@ -3,11 +3,19 @@ import * as ecs from "@aws-cdk/aws-ecs";
 import * as ec2 from "@aws-cdk/aws-ec2";
 import * as efs from "@aws-cdk/aws-efs";
 import * as elb from "@aws-cdk/aws-elasticloadbalancingv2";
-import { Duration, RemovalPolicy } from "@aws-cdk/core";
+import * as s3 from "@aws-cdk/aws-s3";
+import * as iam from "@aws-cdk/aws-iam";
+import { CfnOutput } from "@aws-cdk/core";
 
 export class PathfinderInfraStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    const teamspeakCpu = 256;
+    const teamspeakMem = 1024;
+
+    const armaCpu = 2048;
+    const armaMem = 4096;
 
     const UDP = {
       ecsProtocol: ecs.Protocol.UDP,
@@ -36,6 +44,33 @@ export class PathfinderInfraStack extends cdk.Stack {
       },
     ];
 
+    const teamspeakHealthcheckPort = 10011;
+
+    const armaPorts = [
+      {
+        port: 2302,
+        protocol: UDP,
+      },
+      {
+        port: 2303,
+        protocol: UDP,
+      },
+      {
+        port: 2304,
+        protocol: UDP,
+      },
+      {
+        port: 2305,
+        protocol: UDP,
+      },
+      {
+        port: 2306,
+        protocol: UDP,
+      },
+    ];
+
+    const armaHealthcheckPort = 12345;
+
     const vpc = new ec2.Vpc(this, "MainVpc");
 
     const loadBalancer = new elb.NetworkLoadBalancer(this, "LoadBalancer", {
@@ -63,6 +98,11 @@ export class PathfinderInfraStack extends cdk.Stack {
       }
     );
 
+    const armaSecurityGroup = new ec2.SecurityGroup(this, "ArmaSg", {
+      vpc: vpc,
+      allowAllOutbound: true,
+    });
+
     teamspeakPorts.forEach((forwarding) => {
       teamspeakSecurityGroup.addIngressRule(
         ec2.Peer.anyIpv4(),
@@ -80,6 +120,27 @@ export class PathfinderInfraStack extends cdk.Stack {
       "Access for Teamspeak to persistence volume"
     );
 
+    armaPorts.forEach((forwarding) => {
+      armaSecurityGroup.addIngressRule(
+        ec2.Peer.anyIpv4(), // TODO: Only LB
+        PathfinderInfraStack.port(
+          forwarding.protocol.ec2Protocol,
+          forwarding.port
+        ),
+        "Access for clients of Arma"
+      );
+    });
+
+    armaSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(), // TODO: Only LB
+      PathfinderInfraStack.port(ec2.Protocol.TCP, 12345),
+      "Health check of Arma"
+    );
+
+    // ### S3 BUCKETS ### //
+
+    const dataBucket = new s3.Bucket(this, "ArmaDataBucket", {});
+
     // ### TEAMSPEAK SERVICE ### //
 
     const teamspeakPersistenceFs = new efs.FileSystem(
@@ -88,7 +149,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       {
         vpc: vpc,
         securityGroup: teamspeakPersistenceFsSg,
-        removalPolicy: RemovalPolicy.DESTROY,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
       }
     );
 
@@ -104,8 +165,8 @@ export class PathfinderInfraStack extends cdk.Stack {
       this,
       "TeamspeakTask",
       {
-        cpu: 512,
-        memoryLimitMiB: 2048,
+        cpu: teamspeakCpu,
+        memoryLimitMiB: teamspeakMem,
       }
     );
 
@@ -115,7 +176,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       "TeamspeakContainer",
       {
         image: ecs.ContainerImage.fromRegistry("teamspeak"),
-        memoryLimitMiB: 512,
+        memoryLimitMiB: teamspeakMem,
         environment: {
           TS3SERVER_LICENSE: "accept",
         },
@@ -163,12 +224,88 @@ export class PathfinderInfraStack extends cdk.Stack {
         ],
         healthCheck: {
           protocol: elb.Protocol.TCP,
-          port: "10011",
-          healthyThresholdCount: 3,
-          unhealthyThresholdCount: 3,
-          interval: Duration.seconds(10),
+          port: teamspeakHealthcheckPort.toString(),
         },
       });
+    });
+
+    // ### ARMA SERVICE ### //
+
+    const armaTaskRole = new iam.Role(this, "ArmaTaskRole", {
+      assumedBy: new iam.ServicePrincipal("ecs.amazonaws.com"),
+    });
+
+    dataBucket.grantRead(armaTaskRole);
+
+    const armaTaskDefinition = new ecs.FargateTaskDefinition(this, "ArmaTask", {
+      cpu: armaCpu,
+      memoryLimitMiB: armaMem,
+      taskRole: armaTaskRole,
+    });
+
+    const armaPortMappings = armaPorts.map((element) => {
+      return {
+        containerPort: element.port,
+        hostPort: element.port,
+        protocol: element.protocol.ecsProtocol,
+      };
+    });
+
+    // Add healthcheck port to port mappings
+    armaPortMappings.push({
+      containerPort: armaHealthcheckPort,
+      hostPort: armaHealthcheckPort,
+      protocol: ecs.Protocol.TCP,
+    });
+
+    const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
+      image: ecs.ContainerImage.fromRegistry("markusa380/arma3server"),
+      memoryLimitMiB: armaMem,
+      environment: {
+        STEAM_USER: "markusa390server",
+        STEAM_PASSWORD: "VasuBikiYaru8]", // TODO: Secret?
+        DATA_BUCKET: dataBucket.bucketName,
+      },
+      logging: ecs.AwsLogDriver.awsLogs({
+        streamPrefix: "Arma",
+      }),
+      portMappings: armaPortMappings,
+    });
+
+    const armaService = new ecs.FargateService(this, "ArmaService", {
+      taskDefinition: armaTaskDefinition,
+      cluster: mainCluster,
+      securityGroups: [armaSecurityGroup],
+    });
+
+    armaPorts.forEach((forwarding) => {
+      const listener = loadBalancer.addListener(`Listener${forwarding.port}`, {
+        port: forwarding.port,
+        protocol: forwarding.protocol.elbProtocol,
+      });
+
+      listener.addTargets(`AddTargetGroupsId${forwarding.port}`, {
+        port: forwarding.port,
+        protocol: forwarding.protocol.elbProtocol,
+        targets: [
+          armaService.loadBalancerTarget({
+            containerName: "ArmaContainer",
+            containerPort: forwarding.port,
+            // Not actually used - still fails without it
+            protocol: forwarding.protocol.ecsProtocol,
+          }),
+        ],
+        healthCheck: {
+          protocol: elb.Protocol.TCP,
+          port: armaHealthcheckPort.toString(),
+        },
+      });
+    });
+
+    // ### OUTPUTS ### //
+    const output = new CfnOutput(this, "BucketNameOutput", {
+      value: dataBucket.bucketName,
+      description: "Upload mods.zip here",
     });
   }
 
