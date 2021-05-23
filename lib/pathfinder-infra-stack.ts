@@ -5,6 +5,8 @@ import * as efs from "@aws-cdk/aws-efs";
 import * as elb from "@aws-cdk/aws-elasticloadbalancingv2";
 import * as s3 from "@aws-cdk/aws-s3";
 import * as iam from "@aws-cdk/aws-iam";
+import * as cw from "@aws-cdk/aws-cloudwatch";
+import * as logs from "@aws-cdk/aws-logs";
 import { CfnOutput } from "@aws-cdk/core";
 
 export class PathfinderInfraStack extends cdk.Stack {
@@ -139,7 +141,13 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     // ### S3 BUCKETS ### //
 
-    const dataBucket = new s3.Bucket(this, "ArmaDataBucket", {});
+    const dataBucket = new s3.Bucket(this, "ArmaDataBucket", {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const missionsBucket = new s3.Bucket(this, "ArmaMissionsBucket", {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
     // ### TEAMSPEAK SERVICE ### //
 
@@ -182,6 +190,7 @@ export class PathfinderInfraStack extends cdk.Stack {
         },
         logging: ecs.AwsLogDriver.awsLogs({
           streamPrefix: "Teamspeak",
+          logRetention: logs.RetentionDays.ONE_DAY,
         }),
         portMappings: teamspeakPorts.map((element) => {
           return {
@@ -231,17 +240,13 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     // ### ARMA SERVICE ### //
 
-    const armaTaskRole = new iam.Role(this, "ArmaTaskRole", {
-      assumedBy: new iam.ServicePrincipal("ecs.amazonaws.com"),
-    });
-
-    dataBucket.grantRead(armaTaskRole);
-
     const armaTaskDefinition = new ecs.FargateTaskDefinition(this, "ArmaTask", {
       cpu: armaCpu,
       memoryLimitMiB: armaMem,
-      taskRole: armaTaskRole,
     });
+
+    dataBucket.grantRead(armaTaskDefinition.taskRole);
+    missionsBucket.grantRead(armaTaskDefinition.taskRole);
 
     const armaPortMappings = armaPorts.map((element) => {
       return {
@@ -259,15 +264,19 @@ export class PathfinderInfraStack extends cdk.Stack {
     });
 
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
-      image: ecs.ContainerImage.fromRegistry("markusa380/arma3server"),
+      image: ecs.ContainerImage.fromRegistry(
+        "markusa380/arma3server:release-7"
+      ),
       memoryLimitMiB: armaMem,
       environment: {
         STEAM_USER: "markusa390server",
         STEAM_PASSWORD: "VasuBikiYaru8]", // TODO: Secret?
         DATA_BUCKET: dataBucket.bucketName,
+        MISSIONS_BUCKET: missionsBucket.bucketName,
       },
       logging: ecs.AwsLogDriver.awsLogs({
         streamPrefix: "Arma",
+        logRetention: logs.RetentionDays.ONE_DAY,
       }),
       portMappings: armaPortMappings,
     });
@@ -303,10 +312,24 @@ export class PathfinderInfraStack extends cdk.Stack {
     });
 
     // ### OUTPUTS ### //
-    const output = new CfnOutput(this, "BucketNameOutput", {
-      value: dataBucket.bucketName,
-      description: "Upload mods.zip here",
+    const serverAddressOutput = new CfnOutput(this, "ServerAddressOutput", {
+      value: loadBalancer.loadBalancerDnsName,
+      description: "Server address",
     });
+
+    const dataBucketNameOutput = new CfnOutput(this, "DataBucketNameOutput", {
+      value: dataBucket.bucketName,
+      description: "Data bucket",
+    });
+
+    const missionsBucketNameOutput = new CfnOutput(
+      this,
+      "MissionsBucketNameOutput",
+      {
+        value: missionsBucket.bucketName,
+        description: "Missions bucket",
+      }
+    );
   }
 
   // ### UTILITY METHODS ### //
