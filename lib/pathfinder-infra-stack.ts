@@ -4,14 +4,17 @@ import * as ec2 from "@aws-cdk/aws-ec2";
 import * as efs from "@aws-cdk/aws-efs";
 import * as elb from "@aws-cdk/aws-elasticloadbalancingv2";
 import * as s3 from "@aws-cdk/aws-s3";
-import * as iam from "@aws-cdk/aws-iam";
-import * as cw from "@aws-cdk/aws-cloudwatch";
 import * as logs from "@aws-cdk/aws-logs";
+import * as autoscaling from "@aws-cdk/aws-autoscaling";
 import { CfnOutput } from "@aws-cdk/core";
 
 export class PathfinderInfraStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    // Cron expressions in UTC
+    const startTime = "cron(0 20 * * ? *)"; // 21:00 BST
+    const stopTime = "cron(0 2 * * ? *)" // 01:00 BST
 
     const teamspeakCpu = 256;
     const teamspeakMem = 1024;
@@ -238,6 +241,23 @@ export class PathfinderInfraStack extends cdk.Stack {
       });
     });
 
+    // Autoscaling
+
+    const teamspeakScaling = teamspeakService.autoScaleTaskCount({
+      maxCapacity: 1,
+      minCapacity: 0,
+    });
+
+    teamspeakScaling.scaleOnSchedule("TeamspeakAutoscaleOnSchedule", {
+      schedule: autoscaling.Schedule.expression(startTime),
+      minCapacity: 1,
+    });
+
+    teamspeakScaling.scaleOnSchedule("TeamspeakAutoscaleOffSchedule", {
+      schedule: autoscaling.Schedule.expression(stopTime),
+      maxCapacity: 0,
+    });
+
     // ### ARMA SERVICE ### //
 
     const armaTaskDefinition = new ecs.FargateTaskDefinition(this, "ArmaTask", {
@@ -309,6 +329,22 @@ export class PathfinderInfraStack extends cdk.Stack {
           port: armaHealthcheckPort.toString(),
         },
       });
+    });
+
+    // Autoscaling
+    const armaScaling = armaService.autoScaleTaskCount({
+      maxCapacity: 1,
+      minCapacity: 0,
+    });
+
+    armaScaling.scaleOnSchedule("ArmaAutoscaleOnSchedule", {
+      schedule: autoscaling.Schedule.expression(startTime),
+      minCapacity: 1,
+    });
+
+    armaScaling.scaleOnSchedule("ArmaAutoscaleOffSchedule", {
+      schedule: autoscaling.Schedule.expression(stopTime),
+      maxCapacity: 0,
     });
 
     // ### OUTPUTS ### //
