@@ -324,7 +324,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-23"
+        "markusa380/arma3server:release-27"
       ),
       memoryLimitMiB: armaMem,
       environment: {
@@ -443,7 +443,7 @@ export class PathfinderInfraStack extends cdk.Stack {
   ephemeralStorageHack(taskDef: ecs.FargateTaskDefinition): void {
     const props = taskDef.node.defaultChild as ecs.CfnTaskDefinition;
     props.addPropertyOverride("EphemeralStorage", {
-      SizeInGiB: 100,
+      SizeInGiB: 70,
     });
   }
 }
