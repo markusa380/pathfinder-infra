@@ -152,6 +152,10 @@ export class PathfinderInfraStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    const modsBucket = new s3.Bucket(this, "ArmaModsBucket", {
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // ### TEAMSPEAK SERVICE ### //
 
     const teamspeakPersistenceFs = new efs.FileSystem(
@@ -215,6 +219,8 @@ export class PathfinderInfraStack extends cdk.Stack {
       taskDefinition: teamspeakTaskDefinition,
       cluster: mainCluster,
       securityGroups: [teamspeakSecurityGroup],
+      maxHealthyPercent: 100,
+      minHealthyPercent: 0,
     });
 
     teamspeakPorts.forEach((forwarding) => {
@@ -269,6 +275,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     dataBucket.grantRead(armaTaskDefinition.taskRole);
     missionsBucket.grantRead(armaTaskDefinition.taskRole);
+    modsBucket.grantRead(armaTaskDefinition.taskRole);
 
     const armaPortMappings = armaPorts.map((element) => {
       return {
@@ -285,9 +292,39 @@ export class PathfinderInfraStack extends cdk.Stack {
       protocol: ecs.Protocol.TCP,
     });
 
+    const armaPersistenceFsSg = new ec2.SecurityGroup(
+      this,
+      "ArmaPersistenceFsSg",
+      {
+        vpc: vpc,
+        allowAllOutbound: true,
+      }
+    );
+
+    armaPersistenceFsSg.addIngressRule(
+      armaSecurityGroup,
+      ec2.Port.allTraffic(),
+      "Access for Arma to persistence volume"
+    );
+
+    const armaPersistenceFs = new efs.FileSystem(this, "ArmaPersistenceFs", {
+      vpc: vpc,
+      securityGroup: armaPersistenceFsSg,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const armaProfilePersistenceVolume: ecs.Volume = {
+      name: "ArmaProfilePersistence",
+      efsVolumeConfiguration: {
+        fileSystemId: armaPersistenceFs.fileSystemId,
+      },
+    };
+
+    armaTaskDefinition.addVolume(armaProfilePersistenceVolume);
+
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-13"
+        "markusa380/arma3server:release-23"
       ),
       memoryLimitMiB: armaMem,
       environment: {
@@ -295,6 +332,7 @@ export class PathfinderInfraStack extends cdk.Stack {
         STEAM_PASSWORD: "VasuBikiYaru8]", // TODO: Secret?
         DATA_BUCKET: dataBucket.bucketName,
         MISSIONS_BUCKET: missionsBucket.bucketName,
+        MODS_BUCKET: modsBucket.bucketName
       },
       logging: ecs.AwsLogDriver.awsLogs({
         streamPrefix: "Arma",
@@ -303,10 +341,18 @@ export class PathfinderInfraStack extends cdk.Stack {
       portMappings: armaPortMappings,
     });
 
+    armaTaskContainer.addMountPoints({
+      sourceVolume: armaProfilePersistenceVolume.name,
+      containerPath: "/arma3/configs/profiles/",
+      readOnly: false,
+    });
+
     const armaService = new ecs.FargateService(this, "ArmaService", {
       taskDefinition: armaTaskDefinition,
       cluster: mainCluster,
       securityGroups: [armaSecurityGroup],
+      maxHealthyPercent: 100,
+      minHealthyPercent: 0,
     });
 
     armaPorts.forEach((forwarding) => {
@@ -370,6 +416,17 @@ export class PathfinderInfraStack extends cdk.Stack {
         description: "Missions bucket",
       }
     );
+
+    const modsBucketNameOutput = new CfnOutput(
+      this,
+      "ModsBucketNameOutput",
+      {
+        value: modsBucket.bucketName,
+        description: "Mods bucket"
+      }
+    )
+
+    this.ephemeralStorageHack(armaTaskDefinition);
   }
 
   // ### UTILITY METHODS ### //
@@ -380,6 +437,13 @@ export class PathfinderInfraStack extends cdk.Stack {
       fromPort: port,
       toPort: port,
       stringRepresentation: port + "@" + protocol,
+    });
+  }
+
+  ephemeralStorageHack(taskDef: ecs.FargateTaskDefinition): void {
+    const props = taskDef.node.defaultChild as ecs.CfnTaskDefinition;
+    props.addPropertyOverride("EphemeralStorage", {
+      SizeInGiB: 100,
     });
   }
 }
