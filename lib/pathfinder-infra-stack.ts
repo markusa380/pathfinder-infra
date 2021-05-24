@@ -13,8 +13,8 @@ export class PathfinderInfraStack extends cdk.Stack {
     super(scope, id, props);
 
     // Cron expressions in UTC
-    const startTime = "cron(0 20 * * ? *)"; // 21:00 BST
-    const stopTime = "cron(0 2 * * ? *)"; // 01:00 BST
+    const startTime = "cron(0 18 * * ? *)"; // 19:00 BST
+    const stopTime = "cron(0 23 * * ? *)"; // 00:00 BST
 
     const teamspeakCpu = 256;
     const teamspeakMem = 1024;
@@ -251,10 +251,12 @@ export class PathfinderInfraStack extends cdk.Stack {
     teamspeakScaling.scaleOnSchedule("TeamspeakAutoscaleOnSchedule", {
       schedule: autoscaling.Schedule.expression(startTime),
       minCapacity: 1,
+      maxCapacity: 1,
     });
 
     teamspeakScaling.scaleOnSchedule("TeamspeakAutoscaleOffSchedule", {
       schedule: autoscaling.Schedule.expression(stopTime),
+      minCapacity: 0,
       maxCapacity: 0,
     });
 
@@ -340,10 +342,12 @@ export class PathfinderInfraStack extends cdk.Stack {
     armaScaling.scaleOnSchedule("ArmaAutoscaleOnSchedule", {
       schedule: autoscaling.Schedule.expression(startTime),
       minCapacity: 1,
+      maxCapacity: 1,
     });
 
     armaScaling.scaleOnSchedule("ArmaAutoscaleOffSchedule", {
       schedule: autoscaling.Schedule.expression(stopTime),
+      minCapacity: 0,
       maxCapacity: 0,
     });
 
