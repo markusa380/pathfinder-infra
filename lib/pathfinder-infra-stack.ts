@@ -324,7 +324,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-33"
+        "markusa380/arma3server:release-34"
       ),
       memoryLimitMiB: armaMem,
       environment: {
