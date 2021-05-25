@@ -307,7 +307,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       "Access for Arma to persistence volume"
     );
 
-    const armaPersistenceFs = new efs.FileSystem(this, "ArmaPersistenceFs", {
+    const armaPersistenceFs = new efs.FileSystem(this, "ArmaPersistenceFs3", {
       vpc: vpc,
       securityGroup: armaPersistenceFsSg,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -324,7 +324,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-27"
+        "markusa380/arma3server:release-33"
       ),
       memoryLimitMiB: armaMem,
       environment: {
@@ -343,7 +343,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     armaTaskContainer.addMountPoints({
       sourceVolume: armaProfilePersistenceVolume.name,
-      containerPath: "/arma3/configs/profiles/",
+      containerPath: "/arma3/server/",
       readOnly: false,
     });
 

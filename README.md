@@ -24,6 +24,7 @@ The `lib\pathfinder-infra-stack.ts` file defines the infrastructure stack.
 - `cdk destroy` destroy this stack (use with caution)
 - `cdk diff` compare deployed stack with current state
 - `cdk synth` emits the synthesized CloudFormation template
+- `aws logs tail $group_name --follow` to watch logs of a log group in AWS
 
 ## Setup steps
 - Run `npm install` to install all dependencies
