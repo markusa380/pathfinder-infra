@@ -307,7 +307,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       "Access for Arma to persistence volume"
     );
 
-    const armaPersistenceFs = new efs.FileSystem(this, "ArmaPersistenceFs3", {
+    const armaPersistenceFs = new efs.FileSystem(this, "ArmaPersistenceFs5", {
       vpc: vpc,
       securityGroup: armaPersistenceFsSg,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -320,11 +320,11 @@ export class PathfinderInfraStack extends cdk.Stack {
       },
     };
 
-    armaTaskDefinition.addVolume(armaProfilePersistenceVolume);
+    // armaTaskDefinition.addVolume(armaProfilePersistenceVolume);
 
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-34"
+        "markusa380/arma3server:release-36"
       ),
       memoryLimitMiB: armaMem,
       environment: {
@@ -341,17 +341,19 @@ export class PathfinderInfraStack extends cdk.Stack {
       portMappings: armaPortMappings,
     });
 
+    /*
     armaTaskContainer.addMountPoints({
       sourceVolume: armaProfilePersistenceVolume.name,
-      containerPath: "/arma3/server/",
+      containerPath: "/root/.local/share/",
       readOnly: false,
     });
+    */
 
     const armaService = new ecs.FargateService(this, "ArmaService", {
       taskDefinition: armaTaskDefinition,
       cluster: mainCluster,
       securityGroups: [armaSecurityGroup],
-      maxHealthyPercent: 100,
+      maxHealthyPercent: 200,
       minHealthyPercent: 0,
     });
 
