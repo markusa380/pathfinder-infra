@@ -292,39 +292,9 @@ export class PathfinderInfraStack extends cdk.Stack {
       protocol: ecs.Protocol.TCP,
     });
 
-    const armaPersistenceFsSg = new ec2.SecurityGroup(
-      this,
-      "ArmaPersistenceFsSg",
-      {
-        vpc: vpc,
-        allowAllOutbound: true,
-      }
-    );
-
-    armaPersistenceFsSg.addIngressRule(
-      armaSecurityGroup,
-      ec2.Port.allTraffic(),
-      "Access for Arma to persistence volume"
-    );
-
-    const armaPersistenceFs = new efs.FileSystem(this, "ArmaPersistenceFs5", {
-      vpc: vpc,
-      securityGroup: armaPersistenceFsSg,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    const armaProfilePersistenceVolume: ecs.Volume = {
-      name: "ArmaProfilePersistence",
-      efsVolumeConfiguration: {
-        fileSystemId: armaPersistenceFs.fileSystemId,
-      },
-    };
-
-    // armaTaskDefinition.addVolume(armaProfilePersistenceVolume);
-
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-36"
+        "markusa380/arma3server:release-38"
       ),
       memoryLimitMiB: armaMem,
       environment: {
@@ -340,14 +310,6 @@ export class PathfinderInfraStack extends cdk.Stack {
       }),
       portMappings: armaPortMappings,
     });
-
-    /*
-    armaTaskContainer.addMountPoints({
-      sourceVolume: armaProfilePersistenceVolume.name,
-      containerPath: "/root/.local/share/",
-      readOnly: false,
-    });
-    */
 
     const armaService = new ecs.FargateService(this, "ArmaService", {
       taskDefinition: armaTaskDefinition,
