@@ -7,6 +7,7 @@ import * as s3 from "@aws-cdk/aws-s3";
 import * as logs from "@aws-cdk/aws-logs";
 import * as autoscaling from "@aws-cdk/aws-autoscaling";
 import { CfnOutput } from "@aws-cdk/core";
+import { GatewayVpcEndpoint, GatewayVpcEndpointAwsService } from "@aws-cdk/aws-ec2";
 
 export class PathfinderInfraStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -76,7 +77,13 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     const armaHealthcheckPort = 12345;
 
-    const vpc = new ec2.Vpc(this, "MainVpc");
+    const vpc = new ec2.Vpc(this, "MainVpc", {
+      natGateways: 0 // NAT Gateways do be expensive tho
+    });
+
+    vpc.addGatewayEndpoint("GatewayVpcEndpoint", {
+      service: GatewayVpcEndpointAwsService.S3,
+    });
 
     const loadBalancer = new elb.NetworkLoadBalancer(this, "LoadBalancer", {
       vpc: vpc,
@@ -164,7 +171,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       {
         vpc: vpc,
         securityGroup: teamspeakPersistenceFsSg,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        removalPolicy: cdk.RemovalPolicy.DESTROY
       }
     );
 
@@ -221,6 +228,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       securityGroups: [teamspeakSecurityGroup],
       maxHealthyPercent: 100,
       minHealthyPercent: 0,
+      assignPublicIp: true
     });
 
     teamspeakPorts.forEach((forwarding) => {
@@ -317,6 +325,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       securityGroups: [armaSecurityGroup],
       maxHealthyPercent: 200,
       minHealthyPercent: 0,
+      assignPublicIp: true
     });
 
     armaPorts.forEach((forwarding) => {
