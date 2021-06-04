@@ -81,7 +81,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       natGateways: 0 // NAT Gateways do be expensive tho
     });
 
-    vpc.addGatewayEndpoint("GatewayVpcEndpoint", {
+    const gatewayEndpoint = vpc.addGatewayEndpoint("GatewayVpcEndpoint", {
       service: GatewayVpcEndpointAwsService.S3,
     });
 
