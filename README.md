@@ -28,7 +28,7 @@ This is a CDK deployment project for spinning up the following systems on AWS:
 - Run `npm install` to install all dependencies
 - Run `cdk deploy --parameters <params>` to deploy the application
   - Parameters are in `key=value` or `key="value"` format, separated by spaces
-  - Parameters are:
+  - Possible parameters are:
     - `domainName`: The name of a domain that is owned by the AWS account
     - `startCron`: A cron expression describing when to start the server infrastructure (using UTC timezone)
       - default: `0 18 * * ? *`
@@ -36,6 +36,8 @@ This is a CDK deployment project for spinning up the following systems on AWS:
       - default: `0 23 * * ? *`
     - `steamUser`: Username of the steam user used to download and host the Arma server
     - `steamPassword`: Password of the steam user
+    - `armaServerDiskSizeGiB`: Disk size of the Arma server in GiB
+      - default: 70
   - Note the three outputs:
     - `ServerAddressOutput`
     - `DataBucketNameOutput`
@@ -98,3 +100,4 @@ This is a CDK deployment project for spinning up the following systems on AWS:
 - `cdk diff` compare deployed stack with current state
 - `cdk synth` emits the synthesized CloudFormation template
 - `aws logs tail $group_name --follow` to watch logs of a log group in AWS
+- `npm install -g aws-cdk` to update CDK

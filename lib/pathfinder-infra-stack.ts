@@ -56,7 +56,8 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     const armaServerDiskSizeGiB = new CfnParameter(this, "armaServerDiskSizeGiB", {
       type: "Number",
-      description: `Disk size of the Arma server in GiB. Default: ${defaultArmaServerDiskSizeGb}`
+      description: `Disk size of the Arma server in GiB. Default: ${defaultArmaServerDiskSizeGb}`,
+      default: defaultArmaServerDiskSizeGb
     });
 
     const startTime = `cron(${startCron.valueAsString})`;
@@ -200,14 +201,14 @@ export class PathfinderInfraStack extends cdk.Stack {
       zoneName: domainName.valueAsString
     });
 
-    const tsRecord = new r53.ARecord(this, "TeamspeakARecord", {
+    const tsRecord = new r53.ARecord(this, "TeamspeakRecord", {
       zone: hostedZone,
       target: r53.RecordTarget.fromIpAddresses("111.222.333.444"),
       ttl: cdk.Duration.minutes(1),
       recordName: "ts"
     });
 
-    const armaRecord = new r53.ARecord(this, "TeamspeakARecord", {
+    const armaRecord = new r53.ARecord(this, "ArmaRecord", {
       zone: hostedZone,
       target: r53.RecordTarget.fromIpAddresses("111.222.333.444"),
       ttl: cdk.Duration.minutes(1),
