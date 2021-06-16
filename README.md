@@ -31,9 +31,9 @@ This is a CDK deployment project for spinning up the following systems on AWS:
   - Possible parameters are:
     - `hostedZoneId`: The ID of the hosted zone that should be used
     - `hostedZoneName`: The name of the hosted zone
-    - `startCron`: A cron expression describing when to start the server infrastructure (using UTC timezone)
+    - `startCron`: A [cron](http://www.cronmaker.com) expression describing when to start the server infrastructure (using UTC timezone)
       - default: `0 18 * * ? *`
-    - `stopCron`: A cron expression describing when to stop the server infrastructure (using UTC timezone)
+    - `stopCron`: A [cron](http://www.cronmaker.com) expression describing when to stop the server infrastructure (using UTC timezone)
       - default: `0 23 * * ? *`
     - `steamUser`: Username of the steam user used to download and host the Arma server
     - `steamPassword`: Password of the steam user
