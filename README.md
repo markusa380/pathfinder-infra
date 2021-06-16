@@ -35,6 +35,7 @@ This is a CDK deployment project for spinning up the following systems on AWS:
       - default: `0 18 * * ? *`
     - `stopCron`: A [cron](http://www.cronmaker.com) expression describing when to stop the server infrastructure (using UTC timezone)
       - default: `0 23 * * ? *`
+      - Note: It's better to have stop times for days where the server isn't started automatically, too, so a manually started server isn't forgotten and won't run for days.
     - `steamUser`: Username of the steam user used to download and host the Arma server
     - `steamPassword`: Password of the steam user
     - `armaServerDiskSizeGiB`: Disk size of the Arma server in GiB
