@@ -22,16 +22,20 @@
     "typescript": "~3.9.7"
   },
   "dependencies": {
+    "@aws-cdk/aws-autoscaling": "1.105.0",
     "@aws-cdk/aws-ec2": "1.105.0",
     "@aws-cdk/aws-ecs": "1.105.0",
     "@aws-cdk/aws-efs": "1.105.0",
     "@aws-cdk/aws-elasticloadbalancingv2": "1.105.0",
+    "@aws-cdk/aws-events": "1.105.0",
+    "@aws-cdk/aws-events-targets": "1.105.0",
     "@aws-cdk/aws-iam": "1.105.0",
+    "@aws-cdk/aws-lambda": "1.105.0",
     "@aws-cdk/aws-rds": "1.105.0",
+    "@aws-cdk/aws-route53": "1.105.0",
     "@aws-cdk/aws-s3": "1.105.0",
     "@aws-cdk/aws-secretsmanager": "1.105.0",
     "@aws-cdk/core": "1.105.0",
-    "@aws-cdk/aws-autoscaling": "1.105.0",
     "source-map-support": "^0.5.16"
   }
 }

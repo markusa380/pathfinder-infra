@@ -6,16 +6,67 @@ import * as elb from "@aws-cdk/aws-elasticloadbalancingv2";
 import * as s3 from "@aws-cdk/aws-s3";
 import * as logs from "@aws-cdk/aws-logs";
 import * as autoscaling from "@aws-cdk/aws-autoscaling";
-import { CfnOutput } from "@aws-cdk/core";
-import { GatewayVpcEndpoint, GatewayVpcEndpointAwsService } from "@aws-cdk/aws-ec2";
+import * as r53 from "@aws-cdk/aws-route53";
+import { CfnOutput, CfnParameter } from "@aws-cdk/core";
+import { GatewayVpcEndpointAwsService } from "@aws-cdk/aws-ec2";
+import * as iam from "@aws-cdk/aws-iam";
+import * as lambda from "@aws-cdk/aws-lambda";
+import * as events from "@aws-cdk/aws-events";
+import * as targets from "@aws-cdk/aws-events-targets"
+import * as fs from "fs";
 
 export class PathfinderInfraStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Cron expressions in UTC
-    const startTime = "cron(0 18 * * ? *)"; // 19:00 BST
-    const stopTime = "cron(0 23 * * ? *)"; // 00:00 BST
+    // ### CONSTANTS & INPUTS ### //
+
+    const hostedZoneId = new CfnParameter(this, "hostedZoneId", {
+      type: "String",
+      description: "The ID of the hosted zone",
+    });
+
+    const hostedZoneName = new CfnParameter(this, "hostedZoneName", {
+      type: "String",
+      description: "The name of the hosted zone",
+    });
+
+    const defaultStartCron = "0 18 * * ? *"
+
+    const startCron = new CfnParameter(this, "startCron", {
+      type: "String",
+      description: `A cron expression describing when to start the server infrastructure (using UTC timezone). Default: "${defaultStartCron}"`,
+      default: defaultStartCron
+    });
+
+    const defaultStopCtron = "0 23 * * ? *"
+
+    const stopCron = new CfnParameter(this, "stopCron", {
+      type: "String",
+      description: `A cron expression describing when to stop the server infrastructure (using UTC timezone). Default: "${defaultStopCtron}"`,
+      default: defaultStopCtron
+    });
+
+    const steamUser = new CfnParameter(this, "steamUser", {
+      type: "String",
+      description: "Username of the steam user used to download and host the Arma server"
+    });
+
+    const steamPassword = new CfnParameter(this, "steamPassword", {
+      type: "String",
+      description: "Password of the steam user"
+    });
+
+    const defaultArmaServerDiskSizeGb = 70
+
+    const armaServerDiskSizeGiB = new CfnParameter(this, "armaServerDiskSizeGiB", {
+      type: "Number",
+      description: `Disk size of the Arma server in GiB. Default: ${defaultArmaServerDiskSizeGb}`,
+      default: defaultArmaServerDiskSizeGb
+    });
+
+    const startTime = `cron(${startCron.valueAsString})`;
+    const stopTime = `cron(${stopCron.valueAsString})`;
 
     const teamspeakCpu = 256;
     const teamspeakMem = 1024;
@@ -50,8 +101,6 @@ export class PathfinderInfraStack extends cdk.Stack {
       },
     ];
 
-    const teamspeakHealthcheckPort = 10011;
-
     const armaPorts = [
       {
         port: 2302,
@@ -75,19 +124,13 @@ export class PathfinderInfraStack extends cdk.Stack {
       },
     ];
 
-    const armaHealthcheckPort = 12345;
-
     const vpc = new ec2.Vpc(this, "MainVpc", {
       natGateways: 0 // NAT Gateways do be expensive tho
     });
 
+    // Required so downloading mods on boot will not lead to costs
     const gatewayEndpoint = vpc.addGatewayEndpoint("GatewayVpcEndpoint", {
       service: GatewayVpcEndpointAwsService.S3,
-    });
-
-    const loadBalancer = new elb.NetworkLoadBalancer(this, "LoadBalancer", {
-      vpc: vpc,
-      internetFacing: true,
     });
 
     const mainCluster = new ecs.Cluster(this, "MainCluster", {
@@ -143,12 +186,6 @@ export class PathfinderInfraStack extends cdk.Stack {
       );
     });
 
-    armaSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(), // TODO: Only LB
-      PathfinderInfraStack.port(ec2.Protocol.TCP, 12345),
-      "Health check of Arma"
-    );
-
     // ### S3 BUCKETS ### //
 
     const dataBucket = new s3.Bucket(this, "ArmaDataBucket", {
@@ -161,6 +198,30 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     const modsBucket = new s3.Bucket(this, "ArmaModsBucket", {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // ### ROUTE 53 ### //
+
+    r53.HostedZone.fromHostedZoneId
+
+    // The domain and it's hosted zone already need to exist
+    const hostedZone = r53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+      hostedZoneId: hostedZoneId.valueAsString,
+      zoneName: hostedZoneName.valueAsString
+    });
+
+    const tsRecord = new r53.ARecord(this, "TeamspeakRecord", {
+      zone: hostedZone,
+      target: r53.RecordTarget.fromIpAddresses("0.0.0.0"),
+      ttl: cdk.Duration.minutes(1),
+      recordName: "ts"
+    });
+
+    const armaRecord = new r53.ARecord(this, "ArmaRecord", {
+      zone: hostedZone,
+      target: r53.RecordTarget.fromIpAddresses("0.0.0.0"),
+      ttl: cdk.Duration.minutes(1),
+      recordName: "arma"
     });
 
     // ### TEAMSPEAK SERVICE ### //
@@ -212,7 +273,8 @@ export class PathfinderInfraStack extends cdk.Stack {
             hostPort: element.port,
             protocol: element.protocol.ecsProtocol,
           };
-        }),
+        })
+        // TODO: Healthcheck command?
       }
     );
 
@@ -229,30 +291,6 @@ export class PathfinderInfraStack extends cdk.Stack {
       maxHealthyPercent: 100,
       minHealthyPercent: 0,
       assignPublicIp: true
-    });
-
-    teamspeakPorts.forEach((forwarding) => {
-      const listener = loadBalancer.addListener(`Listener${forwarding.port}`, {
-        port: forwarding.port,
-        protocol: forwarding.protocol.elbProtocol,
-      });
-
-      listener.addTargets(`AddTargetGroupsId${forwarding.port}`, {
-        port: forwarding.port,
-        protocol: forwarding.protocol.elbProtocol,
-        targets: [
-          teamspeakService.loadBalancerTarget({
-            containerName: "TeamspeakContainer",
-            containerPort: forwarding.port,
-            // Not actually used - still fails without it
-            protocol: forwarding.protocol.ecsProtocol,
-          }),
-        ],
-        healthCheck: {
-          protocol: elb.Protocol.TCP,
-          port: teamspeakHealthcheckPort.toString(),
-        },
-      });
     });
 
     // Autoscaling
@@ -293,21 +331,14 @@ export class PathfinderInfraStack extends cdk.Stack {
       };
     });
 
-    // Add healthcheck port to port mappings
-    armaPortMappings.push({
-      containerPort: armaHealthcheckPort,
-      hostPort: armaHealthcheckPort,
-      protocol: ecs.Protocol.TCP,
-    });
-
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
       image: ecs.ContainerImage.fromRegistry(
         "markusa380/arma3server:release-39"
       ),
       memoryLimitMiB: armaMem,
       environment: {
-        STEAM_USER: "markusa390server",
-        STEAM_PASSWORD: "VasuBikiYaru8]", // TODO: Secret?
+        STEAM_USER: steamUser.valueAsString,
+        STEAM_PASSWORD: steamPassword.valueAsString,
         DATA_BUCKET: dataBucket.bucketName,
         MISSIONS_BUCKET: missionsBucket.bucketName,
         MODS_BUCKET: modsBucket.bucketName
@@ -328,30 +359,6 @@ export class PathfinderInfraStack extends cdk.Stack {
       assignPublicIp: true
     });
 
-    armaPorts.forEach((forwarding) => {
-      const listener = loadBalancer.addListener(`Listener${forwarding.port}`, {
-        port: forwarding.port,
-        protocol: forwarding.protocol.elbProtocol,
-      });
-
-      listener.addTargets(`AddTargetGroupsId${forwarding.port}`, {
-        port: forwarding.port,
-        protocol: forwarding.protocol.elbProtocol,
-        targets: [
-          armaService.loadBalancerTarget({
-            containerName: "ArmaContainer",
-            containerPort: forwarding.port,
-            // Not actually used - still fails without it
-            protocol: forwarding.protocol.ecsProtocol,
-          }),
-        ],
-        healthCheck: {
-          protocol: elb.Protocol.TCP,
-          port: armaHealthcheckPort.toString(),
-        },
-      });
-    });
-
     // Autoscaling
     const armaScaling = armaService.autoScaleTaskCount({
       maxCapacity: 1,
@@ -370,11 +377,47 @@ export class PathfinderInfraStack extends cdk.Stack {
       maxCapacity: 0,
     });
 
-    // ### OUTPUTS ### //
-    const serverAddressOutput = new CfnOutput(this, "ServerAddressOutput", {
-      value: loadBalancer.loadBalancerDnsName,
-      description: "Server address",
+    // ### DNS RECORD UPDATER ### //
+
+    const updateRecordsLambda = new lambda.Function(this, 'UpdateDnsRecordsLambda', {
+      code: new lambda.InlineCode(fs.readFileSync('update-dns-records.py', { encoding: 'utf-8' })),
+      handler: 'index.main',
+      timeout: cdk.Duration.seconds(30),
+      runtime: lambda.Runtime.PYTHON_3_6,
+      environment: {
+        HOSTED_ZONE_NAME: hostedZoneName.valueAsString,
+        HOSTED_ZONE_ID: hostedZoneId.valueAsString,
+        CLUSTER_ARN: mainCluster.clusterArn,
+        ARMA_SERVICE_NAME: armaService.serviceName,
+        TEAMSPEAK_SERVICE_NAME: teamspeakService.serviceName,
+      },
+      retryAttempts: 0,
+      logRetention: logs.RetentionDays.ONE_DAY
     });
+
+    updateRecordsLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "route53:Get*",
+          "route53:List*",
+          "route53:ChangeResourceRecordSets",
+          "ecs:List*",
+          "ecs:Get*",
+          "ecs:Describe*",
+          "ec2:DescribeNetworkInterfaces"
+        ],
+        effect: iam.Effect.ALLOW,
+        resources: ["*"] // TODO: Make it more specific
+      })
+    );
+
+    const updateRecordsRule = new events.Rule(this, 'UpdateRecordsRule', {
+      schedule: events.Schedule.expression('rate(1 minute)')
+    });
+
+    updateRecordsRule.addTarget(new targets.LambdaFunction(updateRecordsLambda));
+
+    // ### OUTPUTS ### //
 
     const dataBucketNameOutput = new CfnOutput(this, "DataBucketNameOutput", {
       value: dataBucket.bucketName,
@@ -399,7 +442,7 @@ export class PathfinderInfraStack extends cdk.Stack {
       }
     )
 
-    this.ephemeralStorageHack(armaTaskDefinition);
+    this.ephemeralStorageHack(armaTaskDefinition, armaServerDiskSizeGiB.valueAsNumber);
   }
 
   // ### UTILITY METHODS ### //
@@ -413,10 +456,10 @@ export class PathfinderInfraStack extends cdk.Stack {
     });
   }
 
-  ephemeralStorageHack(taskDef: ecs.FargateTaskDefinition): void {
+  ephemeralStorageHack(taskDef: ecs.FargateTaskDefinition, sizeGiB: number): void {
     const props = taskDef.node.defaultChild as ecs.CfnTaskDefinition;
     props.addPropertyOverride("EphemeralStorage", {
-      SizeInGiB: 70,
+      SizeInGiB: sizeGiB,
     });
   }
 }
