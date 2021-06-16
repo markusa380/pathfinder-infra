@@ -1,6 +1,7 @@
 from os import environ
 import boto3
 
+HOSTED_ZONE_NAME = environ['HOSTED_ZONE_NAME']
 HOSTED_ZONE_ID = environ['HOSTED_ZONE_ID']
 CLUSTER_ARN = environ['CLUSTER_ARN']
 ARMA_SERVICE_NAME = environ['ARMA_SERVICE_NAME']
@@ -39,7 +40,12 @@ def get_current_ip(service: str):
     serviceName = service
   )
 
-  task = tasks_list.get('taskArns')[0]
+  task_arns = tasks_list.get('taskArns')
+  
+  if not task_arns:
+    return None
+
+  task = task_arns[0]
 
   task_desc = ecs.describe_tasks(
     cluster = CLUSTER_ARN,
@@ -58,15 +64,15 @@ def get_current_ip(service: str):
 
   return interface['Association']['PublicIp']
 
-get_current_ip(ecs, 'PathfinderInfraStack-ArmaServiceBE976F5A-ahObTo5sEvco')
-
 def main(event, context):
     print("Started update...")
     arma_ip = get_current_ip(ARMA_SERVICE_NAME)
     print("Current IP of Arma task is", arma_ip)
-    update_record("arma", arma_ip)
-    print("Updated record for Arma server")
+    if arma_ip is not None:
+      update_record("arma." + HOSTED_ZONE_NAME, arma_ip)
+      print("Updated record for Arma server")
     ts_ip = get_current_ip(TEAMSPEAK_SERVICE_NAME)
     print("Current IP of Teamspeak task is", ts_ip)
-    update_record("ts", ts_ip)
-    print("Updated record for Teamspeak server")
+    if ts_ip is not None:
+      update_record("ts." + HOSTED_ZONE_NAME, ts_ip)
+      print("Updated record for Teamspeak server")

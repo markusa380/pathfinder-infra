@@ -21,9 +21,14 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     // ### CONSTANTS & INPUTS ### //
 
-    const domainName = new CfnParameter(this, "domainName", {
+    const hostedZoneId = new CfnParameter(this, "hostedZoneId", {
       type: "String",
-      description: "The domain name used to serve the server infrastructure, e.g. example.com",
+      description: "The ID of the hosted zone",
+    });
+
+    const hostedZoneName = new CfnParameter(this, "hostedZoneName", {
+      type: "String",
+      description: "The name of the hosted zone",
     });
 
     const defaultStartCron = "0 18 * * ? *"
@@ -197,20 +202,24 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     // ### ROUTE 53 ### //
 
-    const hostedZone = new r53.HostedZone(this, "HostedZone", {
-      zoneName: domainName.valueAsString
+    r53.HostedZone.fromHostedZoneId
+
+    // The domain and it's hosted zone already need to exist
+    const hostedZone = r53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
+      hostedZoneId: hostedZoneId.valueAsString,
+      zoneName: hostedZoneName.valueAsString
     });
 
     const tsRecord = new r53.ARecord(this, "TeamspeakRecord", {
       zone: hostedZone,
-      target: r53.RecordTarget.fromIpAddresses("111.222.333.444"),
+      target: r53.RecordTarget.fromIpAddresses("0.0.0.0"),
       ttl: cdk.Duration.minutes(1),
       recordName: "ts"
     });
 
     const armaRecord = new r53.ARecord(this, "ArmaRecord", {
       zone: hostedZone,
-      target: r53.RecordTarget.fromIpAddresses("111.222.333.444"),
+      target: r53.RecordTarget.fromIpAddresses("0.0.0.0"),
       ttl: cdk.Duration.minutes(1),
       recordName: "arma"
     });
@@ -376,11 +385,14 @@ export class PathfinderInfraStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(30),
       runtime: lambda.Runtime.PYTHON_3_6,
       environment: {
-        HOSTED_ZONE_ID: hostedZone.hostedZoneId,
+        HOSTED_ZONE_NAME: hostedZoneName.valueAsString,
+        HOSTED_ZONE_ID: hostedZoneId.valueAsString,
         CLUSTER_ARN: mainCluster.clusterArn,
         ARMA_SERVICE_NAME: armaService.serviceName,
         TEAMSPEAK_SERVICE_NAME: teamspeakService.serviceName,
       },
+      retryAttempts: 0,
+      logRetention: logs.RetentionDays.ONE_DAY
     });
 
     updateRecordsLambda.addToRolePolicy(
@@ -390,22 +402,20 @@ export class PathfinderInfraStack extends cdk.Stack {
           "route53:List*",
           "route53:ChangeResourceRecordSets",
           "ecs:List*",
-          "ecs:Get*"
+          "ecs:Get*",
+          "ecs:Describe*",
+          "ec2:DescribeNetworkInterfaces"
         ],
         effect: iam.Effect.ALLOW,
-        resources: [
-          hostedZone.hostedZoneArn,
-          teamspeakService.serviceArn,
-          armaService.serviceArn
-        ]
+        resources: ["*"] // TODO: Make it more specific
       })
     );
 
-    const rule = new events.Rule(this, 'Rule', {
-      schedule: events.Schedule.expression('cron(0 * * * * *)') // Run every minute
+    const updateRecordsRule = new events.Rule(this, 'UpdateRecordsRule', {
+      schedule: events.Schedule.expression('rate(1 minute)')
     });
 
-    rule.addTarget(new targets.LambdaFunction(updateRecordsLambda));
+    updateRecordsRule.addTarget(new targets.LambdaFunction(updateRecordsLambda));
 
     // ### OUTPUTS ### //
 

@@ -26,10 +26,11 @@ This is a CDK deployment project for spinning up the following systems on AWS:
 - Follow the steps in **Publishing the Arma server docker image** below
 - Purchase or reuse an existing domain from AWS Route53
 - Run `npm install` to install all dependencies
-- Run `cdk deploy --parameters <params>` to deploy the application
-  - Parameters are in `key=value` or `key="value"` format, separated by spaces
+- Run `cdk deploy --parameters <param> --parameters <param> ...` to deploy the application
+  - Parameters are in `key=value` or `key="value"` format
   - Possible parameters are:
-    - `domainName`: The name of a domain that is owned by the AWS account
+    - `hostedZoneId`: The ID of the hosted zone that should be used
+    - `hostedZoneName`: The name of the hosted zone
     - `startCron`: A cron expression describing when to start the server infrastructure (using UTC timezone)
       - default: `0 18 * * ? *`
     - `stopCron`: A cron expression describing when to stop the server infrastructure (using UTC timezone)
