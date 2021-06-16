@@ -17,7 +17,7 @@ This is a CDK deployment project for spinning up the following systems on AWS:
 
 ## ToDo's
 
-* Parametrize the stack definition further: Server memory and CPU sizes
+* Parametrize the stack definition further: Docker image, server memory and CPU sizes
 * Add a simple method of starting/stopping the servers manually
 * Add a simple method to sync mods from local workshop to S3
 
