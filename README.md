@@ -51,7 +51,7 @@ This is a CDK deployment project for spinning up the following systems on AWS:
     - `DataBucketNameOutput` - S3 bucket name to upload configuration for the Arma server
     - `MissionsBucketNameOutput` - S3 bucket name to upload missions for the Arma server
     - `ModsBucketNameOutput` - an S3 bucket name to upload mods for the Arma server
-- From the logs (see *Monitoring Logs*), extract the server admin token `token=...`
+- From the Teamspeak server logs (see *Monitoring Logs*), extract the server admin token `token=...`
 - Connect to the Teamspeak server and enter the server admin token
 - Follow the steps in **Configuring the Arma server** below
 - Follow the steps in **Adding mods to the Arma server** below
