@@ -1,9 +1,7 @@
 import subprocess
 import os
 import shutil
-import socket
 import boto3
-import multiprocessing
 from botocore.errorfactory import ClientError
 import datetime
 import shutil
@@ -59,9 +57,11 @@ def mkdirs():
     makedir(PROFILE_DIR)
     makedir(CONFIG_DIR)
     makedir(USERCONFIG_DIR)
-    makedir("/arma3/steamapps") # Workaround for https://github.com/ValveSoftware/steam-for-linux/issues/7843
+    # Workaround for https://github.com/ValveSoftware/steam-for-linux/issues/7843
+    makedir("/arma3/steamapps")
     # Don't create config dir as it's mounted
     print("All directories created", flush=True)
+
 
 def init_steamcmd():
     steamcmd = ["/steamcmd/steamcmd.sh"]
@@ -201,6 +201,7 @@ def download_missions():
         pass
 
 ############################################################################################################################
+
 
 try:
     print_diskstats()

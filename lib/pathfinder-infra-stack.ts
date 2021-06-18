@@ -14,6 +14,9 @@ import * as lambda from "@aws-cdk/aws-lambda";
 import * as events from "@aws-cdk/aws-events";
 import * as targets from "@aws-cdk/aws-events-targets"
 import * as fs from "fs";
+import { DockerImageAsset } from '@aws-cdk/aws-ecr-assets';
+import * as ecr from "@aws-cdk/aws-ecr";
+import * as path from "path";
 
 export class PathfinderInfraStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
@@ -177,7 +180,7 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     armaPorts.forEach((forwarding) => {
       armaSecurityGroup.addIngressRule(
-        ec2.Peer.anyIpv4(), // TODO: Only LB
+        ec2.Peer.anyIpv4(),
         PathfinderInfraStack.port(
           forwarding.protocol.ec2Protocol,
           forwarding.port
@@ -314,6 +317,10 @@ export class PathfinderInfraStack extends cdk.Stack {
 
     // ### ARMA SERVICE ### //
 
+    const armaServerImage = new DockerImageAsset(this, 'ArmaServerImage', {
+      directory: path.join(__dirname, '..', 'arma-server')
+    });
+
     const armaTaskDefinition = new ecs.FargateTaskDefinition(this, "ArmaTask", {
       cpu: armaCpu,
       memoryLimitMiB: armaMem,
@@ -332,9 +339,7 @@ export class PathfinderInfraStack extends cdk.Stack {
     });
 
     const armaTaskContainer = armaTaskDefinition.addContainer("ArmaContainer", {
-      image: ecs.ContainerImage.fromRegistry(
-        "markusa380/arma3server:release-39"
-      ),
+      image: ecs.ContainerImage.fromDockerImageAsset(armaServerImage),
       memoryLimitMiB: armaMem,
       environment: {
         STEAM_USER: steamUser.valueAsString,

@@ -1,7 +1,5 @@
 FROM debian:buster-slim
 
-LABEL maintainer="Markus"
-
 RUN apt-get update \
     && \
     apt-get install -y --no-install-recommends --no-install-suggests \
@@ -47,8 +45,6 @@ EXPOSE 2306/udp
 ADD launch.py /launch.py
 
 WORKDIR /arma3
-
-VOLUME /steamcmd
 
 STOPSIGNAL SIGINT
 
