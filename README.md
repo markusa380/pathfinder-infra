@@ -74,12 +74,14 @@ This is a CDK deployment project for spinning up the following systems on AWS:
 - Observe logs for any problems (see *Monitoring Logs*)
 
 ## Adding mods to the Arma server
+> Note: This is a makeshift solution and will be replaced with a better one in the future.
 - On the AWS web console, navigate to S3 and find the bucket name that was returned by `ModsBucketNameOutput`
 - Upload local mod directories directly
 - Follow the steps in **Reboot the Arma server** below
 - Observe logs for any problems (see *Monitoring Logs*)
 
 ## Adding missions to the Arma server
+> Note: This is a makeshift solution and will be replaced with a better one in the future.
 - In Arma, export the chosen mission as multiplayer mission (with `.pbo` file extension)
 - On the AWS web console, navigate to *S3* and find the bucket from the `MissionsBucketNameOutput`
 - Upload the mission file
@@ -87,6 +89,7 @@ This is a CDK deployment project for spinning up the following systems on AWS:
 - Observe logs for any problems (see *Monitoring Logs*)
 
 ## Reboot the Arma server
+> Note: This is a makeshift solution and will be replaced with a better one in the future.
 - On the AWS web console, navigate to *ECS* and find the ECS cluster
 - In the ECS cluster, open the tasks and identify the Arma server task using the task definition prefixed with `PathfinderInfraStackArmaTask`
 - Stop the task
