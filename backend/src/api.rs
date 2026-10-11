@@ -1,13 +1,17 @@
 use std::sync::Arc;
 
-use axum::extract::{Query, State};
+use anyhow::anyhow;
+use axum::body::Bytes;
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::files::{self, ConfigFile, Info};
 use crate::modset::{self, Modset};
 use crate::output::Lines;
 use crate::preset::{self, Preset};
@@ -22,6 +26,8 @@ pub fn router(supervisor: Arc<Supervisor>) -> Router {
         .route("/api/stop", post(stop))
         .route("/api/modset", get(get_modset).put(put_modset))
         .route("/api/output", get(output))
+        .route("/api/files", get(list_files))
+        .route("/api/files/{id}", get(download_file).put(upload_file))
         .with_state(supervisor)
 }
 
@@ -66,6 +72,52 @@ async fn output(State(supervisor): AppState, Query(query): Query<OutputQuery>) -
     Json(supervisor.output.since(query.after))
 }
 
+async fn list_files(State(supervisor): AppState) -> Result<Json<Vec<Info>>, ApiError> {
+    let infos = files::ALL
+        .into_iter()
+        .map(|file| file.info(supervisor.data_dir()))
+        .collect::<Result<_, _>>()
+        .map_err(|e| ApiError::internal(e.into()))?;
+    Ok(Json(infos))
+}
+
+async fn download_file(
+    State(supervisor): AppState,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
+    let file = find_file(&id)?;
+    let content = file
+        .read(supervisor.data_dir())
+        .map_err(|e| ApiError::internal(e.into()))?
+        .ok_or_else(|| ApiError::not_found(anyhow!("{} has not been uploaded", file.label)))?;
+    let disposition = format!("attachment; filename=\"{}\"", file.file_name());
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
+            (header::CONTENT_DISPOSITION, disposition),
+        ],
+        content,
+    )
+        .into_response())
+}
+
+async fn upload_file(
+    State(supervisor): AppState,
+    Path(id): Path<String>,
+    content: Bytes,
+) -> Result<Json<Info>, ApiError> {
+    let file = find_file(&id)?;
+    let data_dir = supervisor.data_dir();
+    file.write(data_dir, &content)
+        .and_then(|()| file.info(data_dir))
+        .map(Json)
+        .map_err(|e| ApiError::internal(e.into()))
+}
+
+fn find_file(id: &str) -> Result<&'static ConfigFile, ApiError> {
+    files::find(id).ok_or_else(|| ApiError::not_found(anyhow!("Unknown file {id}")))
+}
+
 struct ApiError {
     status: StatusCode,
     error: anyhow::Error,
@@ -75,6 +127,13 @@ impl ApiError {
     fn bad_request(error: anyhow::Error) -> Self {
         Self {
             status: StatusCode::BAD_REQUEST,
+            error,
+        }
+    }
+
+    fn not_found(error: anyhow::Error) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
             error,
         }
     }

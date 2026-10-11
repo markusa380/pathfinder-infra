@@ -22,9 +22,7 @@ FROM debian:bookworm-slim
 # SteamCMD is a 32-bit program.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates lib32gcc-s1 lib32stdc++6 \
     && rm -rf /var/lib/apt/lists/*
-# Everything that SteamCMD and Arma write goes to /data, the volume.
-RUN useradd --uid 1000 --home-dir /data/home --no-create-home arma
-ENV HOME=/data/home
+RUN useradd --uid 1000 --no-create-home arma
 # SteamCMD updates itself in its own directory.
 COPY --from=steamcmd --chown=arma:arma /steamcmd /opt/steamcmd
 WORKDIR /app

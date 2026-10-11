@@ -26,10 +26,7 @@
     <section>
       <h2>Mods</h2>
       <p id="modset-summary" class="muted">…</p>
-      <label class="button">
-        Upload preset…
-        <input id="preset" type="file" accept=".html,text/html" hidden />
-      </label>
+      <div id="preset-upload"></div>
       <p class="muted small">
         Arma 3 Launcher → Mods → Preset → Export to file. Changes apply at the next start.
       </p>
@@ -39,8 +36,17 @@
     </section>
 
     <section>
-      <h2>Output</h2>
-      <pre id="output"></pre>
+      <h2>Config files</h2>
+      <p class="muted small">Changes apply at the next start.</p>
+      <p id="files-error" class="error" hidden></p>
+      <table class="files">
+        <tbody id="files"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Log</h2>
+      <div id="log" class="log"></div>
     </section>
   </main>
   <script type="module" src="dist/main.js"></script>

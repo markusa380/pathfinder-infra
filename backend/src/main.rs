@@ -1,4 +1,5 @@
 mod api;
+mod files;
 mod mods;
 mod modset;
 mod output;

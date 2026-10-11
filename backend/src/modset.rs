@@ -7,6 +7,7 @@ use std::path::Path;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
+use crate::files;
 use crate::preset::Mod;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -26,8 +27,6 @@ pub fn load(path: &Path) -> anyhow::Result<Option<Modset>> {
 }
 
 pub fn save(path: &Path, modset: &Modset) -> anyhow::Result<()> {
-    // A start that reads the file at the same time sees the old or the new version, never a part.
-    let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, serde_json::to_vec_pretty(modset)?)?;
-    fs::rename(&tmp, path).with_context(|| format!("Could not write {}", path.display()))
+    files::write_atomic(path, &serde_json::to_vec_pretty(modset)?)
+        .with_context(|| format!("Could not write {}", path.display()))
 }

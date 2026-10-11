@@ -108,6 +108,12 @@ button,
   background: var(--accent);
   color: var(--accent-text);
   cursor: pointer;
+  text-decoration: none;
+}
+
+.button.secondary {
+  background: transparent;
+  color: var(--accent);
 }
 
 button:disabled {
@@ -134,11 +140,43 @@ button:disabled {
   color: inherit;
 }
 
-#output {
-  margin: 0;
+.files {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.files td {
+  padding: 8px 8px 8px 0;
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.files a {
+  color: inherit;
+}
+
+.files .actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.files .actions > * + * {
+  margin-left: 8px;
+}
+
+.log {
   height: 360px;
   overflow: auto;
-  font-size: 0.8rem;
+  font: 0.8rem/1.4 ui-monospace, monospace;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.log .warning {
+  color: var(--busy);
+}
+
+.log .error {
+  color: var(--bad);
+  font-weight: 600;
 }

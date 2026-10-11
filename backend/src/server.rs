@@ -18,6 +18,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{Instant, sleep_until, timeout};
 use tokio_util::sync::CancellationToken;
 
+use crate::files;
 use crate::mods;
 use crate::modset;
 use crate::output::Output;
@@ -92,6 +93,10 @@ impl Supervisor {
 
     pub fn state(&self) -> State {
         self.inner.lock().unwrap().state.clone()
+    }
+
+    pub fn data_dir(&self) -> &Path {
+        &self.config.data_dir
     }
 
     pub fn modset_path(&self) -> PathBuf {
@@ -273,26 +278,28 @@ impl Supervisor {
     }
 
     fn arma_command(&self, mod_dirs: &[PathBuf]) -> anyhow::Result<Command> {
+        let data_dir = &self.config.data_dir;
         let server_dir = self.dir("server");
-        let config_dir = self.dir("config");
-        let profiles_dir = self.dir("profiles");
-        std::fs::create_dir_all(&config_dir)?;
-        std::fs::create_dir_all(&profiles_dir)?;
 
         let mut command = Command::new(server_dir.join("arma3server_x64"));
         command
             .current_dir(&server_dir)
             .arg(format!("-port={}", self.config.game_port))
-            .arg("-name=server")
-            .arg(format!("-profiles={}", profiles_dir.display()))
+            .arg(format!("-name={}", files::PROFILE_NAME))
             .arg("-world=empty");
-        let server_cfg = config_dir.join("server.cfg");
-        if server_cfg.exists() {
-            command.arg(format!("-config={}", server_cfg.display()));
+        for (file, option) in [
+            (&files::SERVER_CONFIG, "-config"),
+            (&files::BASIC_CONFIG, "-cfg"),
+        ] {
+            let path = file.path_in(data_dir);
+            if path.exists() {
+                command.arg(format!("{option}={}", path.display()));
+            }
         }
-        let basic_cfg = config_dir.join("basic.cfg");
-        if basic_cfg.exists() {
-            command.arg(format!("-cfg={}", basic_cfg.display()));
+        // CBA loads its settings file from outside a PBO, which needs file
+        // patching. Clients stay restricted by allowedFilePatching.
+        if files::CBA_SETTINGS.path_in(data_dir).exists() {
+            command.arg("-filePatching");
         }
         if !mod_dirs.is_empty() {
             let paths: Vec<_> = mod_dirs
@@ -318,6 +325,9 @@ impl Supervisor {
         // A process group, so signals also reach the processes that
         // steamcmd.sh starts.
         command
+            // SteamCMD and Arma keep their own files (login, profile) under
+            // $HOME, so it must be on the volume.
+            .env("HOME", self.dir("home"))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -461,6 +471,7 @@ done
     const FAKE_ARMA: &str = r#"#!/usr/bin/env bash
 trap 'echo "arma: interrupted"; exit 0' INT
 echo "arma: $*"
+echo "home: $HOME"
 while true; do sleep 0.1; done
 "#;
 
@@ -497,6 +508,12 @@ while true; do sleep 0.1; done
             game_port: 2302,
         }));
         modset::save(&supervisor.modset_path(), &modset).unwrap();
+        files::SERVER_CONFIG
+            .write(&data, b"hostname = \"Test\";")
+            .unwrap();
+        files::CBA_SETTINGS
+            .write(&data, b"force ace_medical_level = 2;")
+            .unwrap();
 
         supervisor.start().unwrap();
         wait_for(&supervisor, "start", |s| matches!(s, State::Running { .. })).await;
@@ -506,13 +523,14 @@ while true; do sleep 0.1; done
         supervisor.stop().unwrap();
         wait_for(&supervisor, "stop", |s| matches!(s, State::Stopped)).await;
         let lines = supervisor.output.since(0).lines;
-        let mod_arg = format!("-mod={}", data.join("mods/450814997").display());
-        assert!(
-            lines
-                .iter()
-                .any(|l| l.starts_with("arma: -port=2302") && l.contains(&mod_arg)),
-            "{lines:?}"
+        let expected = format!(
+            "arma: -port=2302 -name=server -world=empty -config={} -filePatching -mod={}",
+            data.join("config/server.cfg").display(),
+            data.join("mods/450814997").display(),
         );
+        assert!(lines.contains(&expected), "{lines:?}");
+        let home = format!("home: {}", data.join("home").display());
+        assert!(lines.contains(&home), "{lines:?}");
         assert!(lines.iter().any(|l| l == "arma: interrupted"), "{lines:?}");
         assert!(supervisor.stop().is_err());
 
