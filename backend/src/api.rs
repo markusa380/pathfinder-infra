@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use axum::body::Bytes;
-use axum::extract::{Path, Query, State};
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
 use axum::http::StatusCode;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
@@ -12,12 +12,16 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::files::{self, ConfigFile, Info};
+use crate::missions::{self, Mission, MissionName};
 use crate::modset::{self, Modset};
 use crate::output::Lines;
 use crate::preset::{self, Preset};
 use crate::server::{self, Supervisor};
 
 type AppState = State<Arc<Supervisor>>;
+
+/// Missions with many assets can be large.
+const MISSION_SIZE_LIMIT: usize = 512 * 1024 * 1024;
 
 pub fn router(supervisor: Arc<Supervisor>) -> Router {
     Router::new()
@@ -28,6 +32,14 @@ pub fn router(supervisor: Arc<Supervisor>) -> Router {
         .route("/api/output", get(output))
         .route("/api/files", get(list_files))
         .route("/api/files/{id}", get(download_file).put(upload_file))
+        .route("/api/missions", get(list_missions))
+        .route(
+            "/api/missions/{name}",
+            get(download_mission)
+                .put(upload_mission)
+                .delete(delete_mission)
+                .layer(DefaultBodyLimit::max(MISSION_SIZE_LIMIT)),
+        )
         .with_state(supervisor)
 }
 
@@ -90,15 +102,7 @@ async fn download_file(
         .read(supervisor.data_dir())
         .map_err(|e| ApiError::internal(e.into()))?
         .ok_or_else(|| ApiError::not_found(anyhow!("{} has not been uploaded", file.label)))?;
-    let disposition = format!("attachment; filename=\"{}\"", file.file_name());
-    Ok((
-        [
-            (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
-            (header::CONTENT_DISPOSITION, disposition),
-        ],
-        content,
-    )
-        .into_response())
+    Ok(attachment(file.file_name(), content))
 }
 
 async fn upload_file(
@@ -116,6 +120,59 @@ async fn upload_file(
 
 fn find_file(id: &str) -> Result<&'static ConfigFile, ApiError> {
     files::find(id).ok_or_else(|| ApiError::not_found(anyhow!("Unknown file {id}")))
+}
+
+async fn list_missions(State(supervisor): AppState) -> Result<Json<Vec<Mission>>, ApiError> {
+    missions::list(supervisor.data_dir())
+        .map(Json)
+        .map_err(|e| ApiError::internal(e.into()))
+}
+
+async fn download_mission(
+    State(supervisor): AppState,
+    Path(name): Path<String>,
+) -> Result<Response, ApiError> {
+    let name = MissionName::parse(&name).map_err(ApiError::bad_request)?;
+    let content = missions::read(supervisor.data_dir(), &name)
+        .map_err(|e| ApiError::internal(e.into()))?
+        .ok_or_else(|| ApiError::not_found(anyhow!("No mission {}", name.as_str())))?;
+    Ok(attachment(name.as_str(), content))
+}
+
+async fn upload_mission(
+    State(supervisor): AppState,
+    Path(name): Path<String>,
+    content: Bytes,
+) -> Result<Json<Mission>, ApiError> {
+    let name = MissionName::parse(&name).map_err(ApiError::bad_request)?;
+    missions::write(supervisor.data_dir(), &name, &content)
+        .map(Json)
+        .map_err(|e| ApiError::internal(e.into()))
+}
+
+async fn delete_mission(
+    State(supervisor): AppState,
+    Path(name): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let name = MissionName::parse(&name).map_err(ApiError::bad_request)?;
+    match missions::delete(supervisor.data_dir(), &name) {
+        Ok(true) => Ok(StatusCode::NO_CONTENT),
+        Ok(false) => Err(ApiError::not_found(anyhow!("No mission {}", name.as_str()))),
+        Err(e) => Err(ApiError::internal(e.into())),
+    }
+}
+
+/// A file download. The name must not contain `"`.
+fn attachment(file_name: &str, content: Vec<u8>) -> Response {
+    let disposition = format!("attachment; filename=\"{file_name}\"");
+    (
+        [
+            (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
+            (header::CONTENT_DISPOSITION, disposition),
+        ],
+        content,
+    )
+        .into_response()
 }
 
 struct ApiError {

@@ -52,3 +52,15 @@ export const getOutput = (after: number) => request<Lines>("GET", `/api/output?a
 export const getFiles = () => request<FileInfo[]>("GET", "/api/files");
 export const fileUrl = (id: string) => `/api/files/${encodeURIComponent(id)}`;
 export const putFile = (id: string, content: Blob) => request<FileInfo>("PUT", fileUrl(id), content);
+
+export interface Mission {
+  name: string;
+  size: number;
+  /** Unix time of the last change. */
+  modified: number;
+}
+
+export const getMissions = () => request<Mission[]>("GET", "/api/missions");
+export const missionUrl = (name: string) => `/api/missions/${encodeURIComponent(name)}`;
+export const putMission = (name: string, content: Blob) => request<Mission>("PUT", missionUrl(name), content);
+export const deleteMission = (name: string) => request<void>("DELETE", missionUrl(name));

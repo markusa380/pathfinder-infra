@@ -1,4 +1,5 @@
-//! The config files of the Arma server that the admin page manages.
+//! The config files of the Arma server that the admin page manages, and
+//! helpers for all files that it serves.
 
 use std::fs;
 use std::io::{self, ErrorKind};
@@ -75,12 +76,7 @@ impl ConfigFile {
 
     pub fn info(&self, data_dir: &Path) -> io::Result<Info> {
         let modified = match fs::metadata(self.path_in(data_dir)) {
-            Ok(metadata) => Some(
-                metadata
-                    .modified()?
-                    .duration_since(UNIX_EPOCH)
-                    .map_or(0, |d| d.as_secs()),
-            ),
+            Ok(metadata) => Some(modified_secs(&metadata)?),
             Err(e) if e.kind() == ErrorKind::NotFound => None,
             Err(e) => return Err(e),
         };
@@ -93,17 +89,29 @@ impl ConfigFile {
         })
     }
 
-    /// None if the file doesn't exist.
     pub fn read(&self, data_dir: &Path) -> io::Result<Option<Vec<u8>>> {
-        match fs::read(self.path_in(data_dir)) {
-            Ok(content) => Ok(Some(content)),
-            Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e),
-        }
+        read_if_exists(&self.path_in(data_dir))
     }
 
     pub fn write(&self, data_dir: &Path, content: &[u8]) -> io::Result<()> {
         write_atomic(&self.path_in(data_dir), content)
+    }
+}
+
+/// Unix time of the last change.
+pub fn modified_secs(metadata: &fs::Metadata) -> io::Result<u64> {
+    Ok(metadata
+        .modified()?
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs()))
+}
+
+/// None if the file doesn't exist.
+pub fn read_if_exists(path: &Path) -> io::Result<Option<Vec<u8>>> {
+    match fs::read(path) {
+        Ok(content) => Ok(Some(content)),
+        Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e),
     }
 }
 

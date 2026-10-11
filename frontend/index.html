@@ -8,46 +8,70 @@
 </head>
 <body>
   <main>
-    <h1>Arma 3 server</h1>
+    <header class="top">
+      <h1>Arma 3 server</h1>
+      <span id="state" class="badge">…</span>
+    </header>
 
-    <section>
-      <h2>Server</h2>
-      <div class="row">
-        <span id="state" class="badge">…</span>
-        <span id="detail" class="muted"></span>
-      </div>
-      <div class="row">
-        <button id="start">Start</button>
-        <button id="stop">Stop</button>
-      </div>
-      <p id="server-error" class="error" hidden></p>
-    </section>
+    <nav class="tabs">
+      <a href="#server" data-tab="server">Server</a>
+      <a href="#mods" data-tab="mods">Mods</a>
+      <a href="#missions" data-tab="missions">Missions</a>
+      <a href="#config" data-tab="config">Config</a>
+    </nav>
 
-    <section>
-      <h2>Mods</h2>
-      <p id="modset-summary" class="muted">…</p>
-      <div id="preset-upload"></div>
-      <p class="muted small">
-        Arma 3 Launcher → Mods → Preset → Export to file. Changes apply at the next start.
-      </p>
-      <p id="modset-error" class="error" hidden></p>
-      <ul id="warnings" class="warnings"></ul>
-      <ol id="mods" class="mods"></ol>
-    </section>
+    <div data-panel="server">
+      <section>
+        <p id="detail" class="muted"></p>
+        <div class="row">
+          <button id="start">Start</button>
+          <button id="stop">Stop</button>
+        </div>
+        <p id="server-error" class="error" hidden></p>
+      </section>
+      <section>
+        <h2>Log</h2>
+        <div id="log" class="log"></div>
+      </section>
+    </div>
 
-    <section>
-      <h2>Config files</h2>
-      <p class="muted small">Changes apply at the next start.</p>
-      <p id="files-error" class="error" hidden></p>
-      <table class="files">
-        <tbody id="files"></tbody>
-      </table>
-    </section>
+    <div data-panel="mods" hidden>
+      <section>
+        <p id="modset-summary" class="muted">…</p>
+        <div id="preset-upload"></div>
+        <p class="muted small">
+          Arma 3 Launcher → Mods → Preset → Export to file, or export the list of mods.
+          Changes apply at the next start.
+        </p>
+        <p id="modset-error" class="error" hidden></p>
+        <ul id="warnings" class="warnings"></ul>
+        <ol id="mods" class="mods"></ol>
+      </section>
+    </div>
 
-    <section>
-      <h2>Log</h2>
-      <div id="log" class="log"></div>
-    </section>
+    <div data-panel="missions" hidden>
+      <section>
+        <div id="mission-upload"></div>
+        <p class="muted small">
+          Multiplayer missions as <code>.pbo</code> files. File names are stored in lower case.
+        </p>
+        <p id="missions-error" class="error" hidden></p>
+        <table class="files">
+          <tbody id="missions"></tbody>
+        </table>
+        <p id="missions-empty" class="muted" hidden>No missions yet.</p>
+      </section>
+    </div>
+
+    <div data-panel="config" hidden>
+      <section>
+        <p class="muted small">Changes apply at the next start.</p>
+        <p id="files-error" class="error" hidden></p>
+        <table class="files">
+          <tbody id="files"></tbody>
+        </table>
+      </section>
+    </div>
   </main>
   <script type="module" src="dist/main.js"></script>
 </body>

@@ -1,5 +1,6 @@
 mod api;
 mod files;
+mod missions;
 mod mods;
 mod modset;
 mod output;
