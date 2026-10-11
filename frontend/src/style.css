@@ -1,0 +1,144 @@
+:root {
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --text: #1d1f1c;
+  --muted: #6a6e66;
+  --border: #d9dbd4;
+  --accent: #4f6b2f;
+  --accent-text: #ffffff;
+  --ok: #2f7d32;
+  --busy: #a86b00;
+  --bad: #b3261e;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171816;
+    --surface: #20221f;
+    --text: #e6e7e2;
+    --muted: #9a9d94;
+    --border: #363933;
+    --accent: #8fae5f;
+    --accent-text: #11130f;
+    --ok: #79c47c;
+    --busy: #e0a83c;
+    --bad: #f08a80;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, sans-serif;
+}
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 20px;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.badge {
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.badge.running {
+  color: var(--ok);
+}
+
+.badge.updating,
+.badge.stopping {
+  color: var(--busy);
+}
+
+.badge.failed {
+  color: var(--bad);
+}
+
+button,
+.button {
+  display: inline-block;
+  font: inherit;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.error {
+  color: var(--bad);
+}
+
+.warnings {
+  color: var(--busy);
+  padding-left: 20px;
+}
+
+.mods {
+  columns: 2 240px;
+  padding-left: 28px;
+  margin: 12px 0 0;
+}
+
+.mods a {
+  color: inherit;
+}
+
+#output {
+  margin: 0;
+  height: 360px;
+  overflow: auto;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

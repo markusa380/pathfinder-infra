@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arma Server</title>
+  <link rel="stylesheet" href="dist/style.css" />
+</head>
+<body>
+  <main>
+    <h1>Arma 3 server</h1>
+
+    <section>
+      <h2>Server</h2>
+      <div class="row">
+        <span id="state" class="badge">…</span>
+        <span id="detail" class="muted"></span>
+      </div>
+      <div class="row">
+        <button id="start">Start</button>
+        <button id="stop">Stop</button>
+      </div>
+      <p id="server-error" class="error" hidden></p>
+    </section>
+
+    <section>
+      <h2>Mods</h2>
+      <p id="modset-summary" class="muted">…</p>
+      <label class="button">
+        Upload preset…
+        <input id="preset" type="file" accept=".html,text/html" hidden />
+      </label>
+      <p class="muted small">
+        Arma 3 Launcher → Mods → Preset → Export to file. Changes apply at the next start.
+      </p>
+      <p id="modset-error" class="error" hidden></p>
+      <ul id="warnings" class="warnings"></ul>
+      <ol id="mods" class="mods"></ol>
+    </section>
+
+    <section>
+      <h2>Output</h2>
+      <pre id="output"></pre>
+    </section>
+  </main>
+  <script type="module" src="dist/main.js"></script>
+</body>
+</html>
