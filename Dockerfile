@@ -25,7 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && sed -i 's/^# *\(en_US.UTF-8 UTF-8\)/\1/' /etc/locale.gen \
     && locale-gen
 ENV LANG=en_US.UTF-8
-RUN useradd --uid 1000 --no-create-home arma
+# Arma finds its log and profile directory through the home in /etc/passwd,
+# not $HOME. Without a writable one it crashes at start.
+RUN useradd --uid 1000 --home-dir /data/home --no-create-home arma
 # SteamCMD updates itself in its own directory.
 COPY --from=steamcmd --chown=arma:arma /steamcmd /opt/steamcmd
 WORKDIR /app
