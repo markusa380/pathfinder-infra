@@ -242,11 +242,10 @@ impl Supervisor {
             let lines = self
                 .steamcmd(&self.dir("workshop"), &commands, cancel)
                 .await?;
+            // SteamCMD writes the next message on the same line as a result.
             missing.retain(|m| {
-                let downloaded = format!("Downloaded item {} ", m.id);
-                !lines
-                    .iter()
-                    .any(|line| line.starts_with("Success.") && line.contains(&downloaded))
+                let downloaded = format!("Success. Downloaded item {} ", m.id);
+                !lines.iter().any(|line| line.contains(&downloaded))
             });
         }
         if !missing.is_empty() {
@@ -453,7 +452,8 @@ mod tests {
     use crate::modset::Modset;
     use crate::test_util::{temp_dir, write_script};
 
-    /// Acts like SteamCMD: "installs" the server and "downloads" each item.
+    /// Acts like SteamCMD: "installs" the server and "downloads" each item,
+    /// with the result and the next message on one line, as SteamCMD does.
     const FAKE_STEAMCMD: &str = r#"#!/usr/bin/env bash
 dir=$2
 while [ $# -gt 0 ]; do
@@ -461,7 +461,8 @@ while [ $# -gt 0 ]; do
     +app_update) echo "Success! App '$2' fully installed."; shift 2 ;;
     +workshop_download_item)
       mkdir -p "$dir/steamapps/workshop/content/$2/$3/Addons"
-      echo "Success. Downloaded item $3 to \"$dir\" (3 bytes)"
+      echo "Downloading item $3 ..."
+      printf 'Success. Downloaded item %s to "%s" (3 bytes)' "$3" "$dir"
       shift 3 ;;
     *) shift ;;
   esac
