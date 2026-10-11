@@ -32,6 +32,9 @@ const GAME_APP: &str = "107410";
 const DOWNLOAD_ATTEMPTS: usize = 3;
 /// Time for a graceful stop before the process is killed.
 const STOP_TIMEOUT: Duration = Duration::from_secs(30);
+/// Inside the server directory: Arma on Linux only finds mods by paths
+/// relative to it.
+const MODS_DIR: &str = "mods";
 
 pub struct Config {
     pub data_dir: PathBuf,
@@ -176,7 +179,7 @@ impl Supervisor {
             .dir("workshop")
             .join("steamapps/workshop/content")
             .join(GAME_APP);
-        let mods_dir = self.dir("mods");
+        let mods_dir = self.dir("server").join(MODS_DIR);
         let keys_dir = self.dir("server").join("keys");
         let ids: Vec<u64> = modset.mods.iter().map(|m| m.id).collect();
         let mod_dirs = tokio::task::spawn_blocking(move || {
@@ -303,6 +306,7 @@ impl Supervisor {
         if !mod_dirs.is_empty() {
             let paths: Vec<_> = mod_dirs
                 .iter()
+                .filter_map(|dir| dir.strip_prefix(&server_dir).ok())
                 .map(|dir| dir.display().to_string())
                 .collect();
             command.arg(format!("-mod={}", paths.join(";")));
@@ -525,10 +529,10 @@ while true; do sleep 0.1; done
         wait_for(&supervisor, "stop", |s| matches!(s, State::Stopped)).await;
         let lines = supervisor.output.since(0).lines;
         let expected = format!(
-            "arma: -port=2302 -name=server -world=empty -config={} -filePatching -mod={}",
+            "arma: -port=2302 -name=server -world=empty -config={} -filePatching -mod=mods/450814997",
             data.join("config/server.cfg").display(),
-            data.join("mods/450814997").display(),
         );
+        assert!(data.join("server/mods/450814997/addons").is_dir());
         assert!(lines.contains(&expected), "{lines:?}");
         let home = format!("home: {}", data.join("home").display());
         assert!(lines.contains(&home), "{lines:?}");

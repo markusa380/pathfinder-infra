@@ -48,7 +48,7 @@ The rest is managed by the server:
 | `server/mpmissions/` | Missions (`.pbo`) |
 | `server/` | The server, installed by SteamCMD |
 | `workshop/` | Downloaded mods, as SteamCMD keeps them |
-| `mods/` | Lower-case symlinks to the mods, rebuilt at each start |
+| `server/mods/` | Lower-case symlinks to the mods, rebuilt at each start |
 | `modset.json` | The mods of the last uploaded preset |
 | `home/` | `$HOME` of SteamCMD and the server |
 
